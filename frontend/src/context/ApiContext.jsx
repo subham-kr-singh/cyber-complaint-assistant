@@ -1,12 +1,14 @@
 import axios from "axios";
 
 // Single source of truth for the backend base URL.
-// Set VITE_API_URL in a .env file at the frontend root for production.
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+// In local dev (no VITE_API_URL set) the Vite proxy forwards /api → http://localhost:5000/api.
+// In production set VITE_API_URL to your deployed backend URL (e.g. https://your-app.onrender.com/api).
+const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
+  withCredentials: false,
 });
 
 // Attach the JWT token (if present) to every outgoing request
@@ -49,7 +51,9 @@ export const complaintApi = {
   classify: (id) => api.post(`/complaints/${id}/classify`),
   submit: (id) => api.post(`/complaints/${id}/submit`),
   getSummary: (id) => api.get(`/complaints/${id}/summary`),
-  getPdfUrl: (id) => `${BASE_URL}/complaints/${id}/pdf`,
+  // Returns a URL string; uses the raw BASE_URL so the browser can open it directly
+  getPdfUrl: (id) =>
+    `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/complaints/${id}/pdf`,
   getStatus: (id) => api.get(`/complaints/${id}/status`),
   updateStatus: (id, status) => api.patch(`/complaints/${id}/status`, { status }),
 };
@@ -63,11 +67,13 @@ export const evidenceApi = {
     });
   },
   list: (complaintId) => api.get(`/complaints/${complaintId}/evidence`),
-  remove: (complaintId, fileId) => api.delete(`/complaints/${complaintId}/evidence/${fileId}`),
+  remove: (complaintId, fileId) =>
+    api.delete(`/complaints/${complaintId}/evidence/${fileId}`),
 };
 
 export const routingApi = {
-  getAuthority: (crimeType) => api.get(`/routing/authority`, { params: { crimeType } }),
+  getAuthority: (crimeType) =>
+    api.get(`/routing/authority`, { params: { crimeType } }),
   listCategories: () => api.get("/routing/categories"),
 };
 
