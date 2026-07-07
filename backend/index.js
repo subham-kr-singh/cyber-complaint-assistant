@@ -17,6 +17,7 @@ import authRoutes from "./src/routes/auth.routes.js";
 import complaintRoutes from "./src/routes/complaint.routes.js";
 import evidenceRoutes from "./src/routes/evidence.routes.js";
 import routingRoutes from "./src/routes/routing.routes.js";
+import morgan from "morgan";
 
 const app = express();
 
@@ -29,6 +30,8 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(morgan("dev"))
+
 
 // Basic rate limiting on all API routes
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
