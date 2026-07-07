@@ -25,17 +25,18 @@ const fallbackClassify = (description = "") => {
  * and suggests required evidence, using Gemini. Falls back to
  * keyword matching if the API key is missing or the call fails.
  */
-const classifyCrime = async (description) => {
+const classifyCrime = async (incidentDetails) => {
   if (!process.env.GEMINI_API_KEY) {
-    return fallbackClassify(description);
+    return fallbackClassify(incidentDetails?.description || "");
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const runPrompt = async (retryCount = 0) => {
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `
-You are a cybercrime triage assistant. Read the victim's description below and respond
+      const prompt = `
+You are a cybercrime triage assistant. Read the victim's incident details below and respond
 ONLY with strict JSON (no markdown, no extra text) in this exact shape:
 {
   "crimeType": "one of: upi_fraud, phishing, sextortion, cyberbullying, identity_theft, social_media_hack, other",
@@ -43,24 +44,36 @@ ONLY with strict JSON (no markdown, no extra text) in this exact shape:
   "requiredEvidence": ["short evidence item", "short evidence item"]
 }
 
-Victim description: "${description}"
+Incident details:
+${JSON.stringify(incidentDetails, null, 2)}
 `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      
+      try {
+        const parsed = JSON.parse(cleaned);
+        return {
+          crimeType: parsed.crimeType || "other",
+          confidence: parsed.confidence ?? 0.6,
+          requiredEvidence: parsed.requiredEvidence || [],
+          source: "gemini",
+        };
+      } catch (parseErr) {
+        if (retryCount === 0) {
+          console.warn("Gemini JSON parse failed, retrying once...");
+          return runPrompt(1);
+        }
+        throw parseErr;
+      }
+    } catch (err) {
+      console.error("Gemini classification failed, using fallback:", err.message);
+      return fallbackClassify(incidentDetails?.description || "");
+    }
+  };
 
-    return {
-      crimeType: parsed.crimeType || "other",
-      confidence: parsed.confidence ?? 0.6,
-      requiredEvidence: parsed.requiredEvidence || [],
-      source: "gemini",
-    };
-  } catch (err) {
-    console.error("Gemini classification failed, using fallback:", err.message);
-    return fallbackClassify(description);
-  }
+  return runPrompt(0);
 }
 
 export { classifyCrime, fallbackClassify };

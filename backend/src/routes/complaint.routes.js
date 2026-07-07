@@ -5,6 +5,7 @@ import {
   answerQuestion,
   getComplaint,
   listComplaints,
+  listAllComplaints,
   updateComplaint,
   deleteComplaint,
   classifyComplaint,
@@ -21,6 +22,7 @@ router.use(protect); // every complaint route requires a logged-in user
 
 router.post("/start", startComplaint);
 router.get("/", listComplaints);
+router.get("/admin", adminOnly, listAllComplaints);
 router.get("/:id", getComplaint);
 router.patch("/:id", updateComplaint);
 router.delete("/:id", deleteComplaint);

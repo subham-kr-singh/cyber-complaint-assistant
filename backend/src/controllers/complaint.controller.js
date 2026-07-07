@@ -2,6 +2,7 @@ import Complaint from "../models/Complaint.js";
 import RoutingAuthority from "../models/RoutingAuthority.js";
 import { classifyCrime } from "../utils/classifyCrime.js";
 import { generateComplaintPdf } from "../utils/generatePdf.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 // A minimal scripted question flow. Swap/expand this as your team builds it out.
 const GUIDED_QUESTIONS = [
@@ -13,8 +14,7 @@ const GUIDED_QUESTIONS = [
 ];
 
 // POST /api/complaints/start
-const startComplaint = async (req, res, next) => {
-  try {
+const startComplaint = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.create({
       userId: req.user._id,
       conversation: [],
@@ -26,14 +26,10 @@ const startComplaint = async (req, res, next) => {
       complaintId: complaint._id,
       firstQuestion: GUIDED_QUESTIONS[0],
     });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // POST /api/complaints/:id/answer
-const answerQuestion = async (req, res, next) => {
-  try {
+const answerQuestion = asyncHandler(async (req, res, next) => {
     const { question, answer } = req.body;
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
@@ -48,42 +44,32 @@ const answerQuestion = async (req, res, next) => {
     if (idx === 3) complaint.incidentDetails.amountLost = Number(answer) || 0;
     if (idx === 4) complaint.incidentDetails.suspectInfo = answer;
 
+    complaint.emptyDraftExpiresAt = undefined;
+
     await complaint.save();
 
     const nextQuestion = GUIDED_QUESTIONS[complaint.conversation.length] || null;
 
     res.json({ success: true, nextQuestion, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // GET /api/complaints/:id
-const getComplaint = async (req, res, next) => {
-  try {
+const getComplaint = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id }).populate(
       "evidenceIds"
     );
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     res.json({ success: true, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // GET /api/complaints
-const listComplaints = async (req, res, next) => {
-  try {
+const listComplaints = asyncHandler(async (req, res, next) => {
     const complaints = await Complaint.find({ userId: req.user._id }).sort({ createdAt: -1 });
     res.json({ success: true, complaints });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // PATCH /api/complaints/:id
-const updateComplaint = async (req, res, next) => {
-  try {
+const updateComplaint = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },
       { $set: req.body },
@@ -91,14 +77,10 @@ const updateComplaint = async (req, res, next) => {
     );
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     res.json({ success: true, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // DELETE /api/complaints/:id
-const deleteComplaint = async (req, res, next) => {
-  try {
+const deleteComplaint = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     if (complaint.status !== "draft") {
@@ -106,18 +88,14 @@ const deleteComplaint = async (req, res, next) => {
     }
     await complaint.deleteOne();
     res.json({ success: true, message: "Complaint deleted" });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // POST /api/complaints/:id/classify
-const classifyComplaint = async (req, res, next) => {
-  try {
+const classifyComplaint = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
 
-    const result = await classifyCrime(complaint.incidentDetails.description);
+    const result = await classifyCrime(complaint.incidentDetails);
 
     complaint.crimeType = result.crimeType;
     complaint.crimeCategoryConfidence = result.confidence;
@@ -138,15 +116,11 @@ const classifyComplaint = async (req, res, next) => {
 
     await complaint.save();
     res.json({ success: true, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // POST /api/complaints/:id/submit
-const submitComplaint = async (req, res, next) => {
-  try {
-    const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
+const submitComplaint = asyncHandler(async (req, res, next) => {
+    const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id }).populate("evidenceIds");
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
 
     complaint.status = "submitted";
@@ -158,57 +132,38 @@ const submitComplaint = async (req, res, next) => {
 
     await complaint.save();
     res.json({ success: true, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // GET /api/complaints/:id/summary
-const getSummary = async (req, res, next) => {
-  try {
+const getSummary = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     res.json({ success: true, summary: complaint.generatedSummary || buildSummary(complaint) });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // GET /api/complaints/:id/pdf
-const downloadPdf = async (req, res, next) => {
-  try {
+const downloadPdf = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id });
     if (!complaint || !complaint.pdfUrl) {
       return res.status(404).json({ success: false, message: "PDF not generated yet" });
     }
     res.redirect(complaint.pdfUrl);
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // GET /api/complaints/:id/status
-const getStatus = async (req, res, next) => {
-  try {
+const getStatus = asyncHandler(async (req, res, next) => {
     const complaint = await Complaint.findOne({ _id: req.params.id, userId: req.user._id }).select("status");
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     res.json({ success: true, status: complaint.status });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 // PATCH /api/complaints/:id/status  (admin only)
-const updateStatus = async (req, res, next) => {
-  try {
+const updateStatus = asyncHandler(async (req, res, next) => {
     const { status } = req.body;
     const complaint = await Complaint.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!complaint) return res.status(404).json({ success: false, message: "Complaint not found" });
     res.json({ success: true, complaint });
-  } catch (err) {
-    next(err);
-  }
-}
+  });
 
 const buildSummary = (complaint) => {
   const d = complaint.incidentDetails || {};
@@ -217,11 +172,44 @@ const buildSummary = (complaint) => {
   }. Incident: ${d.description || "N/A"}. Amount lost: ${d.amountLost ?? "N/A"}.`;
 }
 
+// GET /api/complaints/admin
+const listAllComplaints = asyncHandler(async (req, res, next) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+    if (req.query.crimeType) {
+      filter.crimeType = req.query.crimeType;
+    }
+
+    const complaints = await Complaint.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Complaint.countDocuments(filter);
+
+    res.json({
+      success: true,
+      complaints,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      }
+    });
+  });
+
 export { 
   startComplaint,
   answerQuestion,
   getComplaint,
   listComplaints,
+  listAllComplaints,
   updateComplaint,
   deleteComplaint,
   classifyComplaint,

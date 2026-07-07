@@ -23,9 +23,24 @@ const app = express();
 
 // --- Core middleware ---
 app.use(helmet());
+// Robust CORS configuration
+const clientUrls = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((url) => url.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+const allowedOrigins = [...clientUrls, "http://localhost:5173", "http://localhost:5174"];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith("http://localhost:")) {
+        callback(null, true);
+      } else {
+        console.error(`CORS blocked request from origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );

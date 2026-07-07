@@ -49,6 +49,7 @@ const complaintSchema = new mongoose.Schema(
     officerNotes: { type: String, default: "" },
 
     submittedAt: { type: Date },
+    emptyDraftExpiresAt: { type: Date, default: () => new Date(Date.now() + 24*60*60*1000), expires: 0 },
   },
   { timestamps: true }
 );

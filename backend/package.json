@@ -4,6 +4,9 @@
   "description": "Backend API for Smart Cyber Complaint Support",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
@@ -23,6 +26,7 @@
     "mongoose": "^8.4.0",
     "morgan": "^1.11.0",
     "multer": "^1.4.5-lts.1",
+    "multer-storage-cloudinary": "^4.0.0",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
