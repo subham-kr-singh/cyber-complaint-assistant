@@ -1,33 +1,9 @@
 import express from "express";
 import multer from "multer";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 import { protect } from "../middleware/auth.js";
 import { uploadEvidence, listEvidence, deleteEvidence } from "../controllers/evidence.controller.js";
 
 const router = express.Router({ mergeParams: true });
-
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "smart-cyber-complaint/evidence",
-    // We allow all raw files so we can manually filter via multer
-    resource_type: "auto",
-  },
-});
 
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
@@ -47,7 +23,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter,
 });
