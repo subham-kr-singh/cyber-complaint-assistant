@@ -6,7 +6,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
-
+import http from "node:http"
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -31,7 +31,15 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      // Allow requests with no origin (e.g. server-to-server proxy, curl)
+      if (!origin) return callback(null, true);
+      
+      // In development, allow all origins to make local network testing seamless
+      if (process.env.NODE_ENV === "development") return callback(null, true);
+
+      // In production, strictly check against ALLOWED_ORIGINS
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -61,7 +69,9 @@ app.get("/api/health", (req, res) => res.json({ success: true, message: "API is 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0';
+const server = http.createServer(app)
 
 connectDB().then(() => {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  server.listen(PORT, HOST, () => console.log(`Server running on port ${PORT}`));
 });
