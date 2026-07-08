@@ -6,6 +6,16 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function sanitizeForPdf(text) {
+  if (text === null || text === undefined) return "N/A";
+  return String(text)
+    .replace(/₹/g, "Rs.")
+    .replace(/[\u2018\u2019]/g, "'")   // smart single quotes -> straight quote
+    .replace(/[\u201C\u201D]/g, '"')   // smart double quotes -> straight quote
+    .replace(/\u2013|\u2014/g, "-")    // en/em dash -> hyphen
+    .replace(/[^\x00-\x7F]/g, "");     // strip any remaining non-ASCII/WinAnsi-unsafe chars
+}
+
 /**
  * Generates a simple complaint PDF from a complaint document
  * and saves it under /uploads/pdfs. Returns the relative file path.
@@ -61,29 +71,29 @@ const generateComplaintPdf = async (complaint, user) => {
 
   drawLine("Cyber Crime Complaint", { size: 18, bold: true });
   y -= 10;
-  drawLine(`Case Reference: ${complaint._id}`, { bold: true });
+  drawLine(`Case Reference: ${sanitizeForPdf(complaint._id)}`, { bold: true });
   y -= 10;
-  drawLine(`Complainant: ${user.name}`, { bold: true });
-  drawLine(`Email: ${user.email}`);
-  drawLine(`Phone: ${user.phone || "N/A"}`);
+  drawLine(`Complainant: ${sanitizeForPdf(user.name)}`, { bold: true });
+  drawLine(`Email: ${sanitizeForPdf(user.email)}`);
+  drawLine(`Phone: ${sanitizeForPdf(user.phone)}`);
   y -= 10;
-  drawLine(`Crime Type: ${complaint.crimeType || "Not classified"}`, { bold: true });
-  drawLine(`Date of Incident: ${complaint.incidentDetails?.dateOfIncident || "N/A"}`);
-  drawLine(`Platform: ${complaint.incidentDetails?.platform || "N/A"}`);
-  drawLine(`Amount Lost: ${complaint.incidentDetails?.amountLost ?? "N/A"}`);
+  drawLine(`Crime Type: ${sanitizeForPdf(complaint.crimeType || "Not classified")}`, { bold: true });
+  drawLine(`Date of Incident: ${sanitizeForPdf(complaint.incidentDetails?.dateOfIncident)}`);
+  drawLine(`Platform: ${sanitizeForPdf(complaint.incidentDetails?.platform)}`);
+  drawLine(`Amount Lost: ${sanitizeForPdf(complaint.incidentDetails?.amountLost)}`);
   y -= 10;
   drawLine("Incident Description:", { bold: true });
-  drawLine(complaint.incidentDetails?.description || "N/A");
+  drawLine(sanitizeForPdf(complaint.incidentDetails?.description));
   y -= 10;
   drawLine("Routed Authority:", { bold: true });
-  drawLine(complaint.routedAuthority?.name || "Not yet routed");
-  drawLine(complaint.routedAuthority?.portalUrl || "");
+  drawLine(sanitizeForPdf(complaint.routedAuthority?.name || "Not yet routed"));
+  drawLine(sanitizeForPdf(complaint.routedAuthority?.portalUrl || ""));
   
   if (complaint.evidenceIds && complaint.evidenceIds.length > 0) {
     y -= 10;
     drawLine("Evidence Attached:", { bold: true });
     complaint.evidenceIds.forEach((ev, i) => {
-      drawLine(`${i + 1}. ${ev.fileName} (${ev.fileType})`);
+      drawLine(`${i + 1}. ${sanitizeForPdf(ev.fileName)} (${sanitizeForPdf(ev.fileType)})`);
     });
   }
 
@@ -96,6 +106,36 @@ const generateComplaintPdf = async (complaint, user) => {
   fs.writeFileSync(filePath, pdfBytes);
 
   return `/uploads/pdfs/${fileName}`;
+}
+
+if (process.env.NODE_ENV === "test") {
+  (async () => {
+    try {
+      const mockComplaint = {
+        _id: "test-id-123",
+        crimeType: "Financial Fraud",
+        incidentDetails: {
+          dateOfIncident: "2026-07-08",
+          platform: "WhatsApp",
+          amountLost: "₹5000",
+          description: "Got scammed “big time” — lost money \uD83D\uDE22",
+        },
+        routedAuthority: {
+          name: "Cyber Cell",
+          portalUrl: "https://cybercrime.gov.in"
+        }
+      };
+      const mockUser = {
+        name: "John Doe",
+        email: "john@example.com",
+        phone: "+91 9999999999"
+      };
+      const result = await generateComplaintPdf(mockComplaint, mockUser);
+      console.log("Regression test passed. PDF generated at:", result);
+    } catch (err) {
+      console.error("Regression test failed:", err);
+    }
+  })();
 }
 
 export { generateComplaintPdf };

@@ -51,9 +51,7 @@ export const complaintApi = {
   classify: (id) => api.post(`/complaints/${id}/classify`),
   submit: (id) => api.post(`/complaints/${id}/submit`),
   getSummary: (id) => api.get(`/complaints/${id}/summary`),
-  // Returns a URL string; uses the raw BASE_URL so the browser can open it directly
-  getPdfUrl: (id) =>
-    `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/complaints/${id}/pdf`,
+  downloadPdf: (id) => api.get(`/complaints/${id}/pdf`, { responseType: "blob" }),
   getStatus: (id) => api.get(`/complaints/${id}/status`),
   updateStatus: (id, status) => api.patch(`/complaints/${id}/status`, { status }),
 };

@@ -42,6 +42,23 @@ export default function ComplaintDetail() {
   if (loading) return <div className="p-8 text-center text-paperText/60">Loading...</div>;
   if (!complaint) return <div className="p-8 text-center text-paperText/60">Complaint not found.</div>;
 
+  async function handleDownloadPdf() {
+    try {
+      const res = await complaintApi.downloadPdf(id);
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `complaint_${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("Could not download PDF");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
       <div className="rounded-lg border border-paperDim bg-white p-6">
@@ -130,14 +147,12 @@ export default function ComplaintDetail() {
         )}
 
         {complaint.pdfUrl && (
-          <a
-            href={complaintApi.getPdfUrl(id)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={handleDownloadPdf}
             className="flex items-center gap-2 rounded border border-stampRed px-5 py-2.5 text-stampRed transition-colors hover:bg-stampRed/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stampRed"
           >
             <FaDownload aria-hidden="true" /> Download Complaint PDF
-          </a>
+          </button>
         )}
       </div>
     </div>
